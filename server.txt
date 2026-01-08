@@ -1,0 +1,76 @@
+const express = require("express");
+const path = require("path");
+const mongoose = require("mongoose");
+const app = express();
+const PORT = process.env.PORT || 3000;
+
+// 1) Middleware
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, "public")));
+
+// 2) Connect to MongoDB (replace with your connection string)
+const MONGODB_URI = process.env.MONGODB_URI || "YOUR_MONGODB_ATLAS_URI_HERE";
+
+mongoose
+  .connect(MONGODB_URI)
+  .then(() => console.log("MongoDB connected"))
+  .catch((err) => console.error("Mongo error", err));
+
+// 3) Schema for messages
+const messageSchema = new mongoose.Schema(
+  {
+    text: { type: String, required: true },
+    ip: String,
+    userAgent: String,
+    referrer: String,
+  },
+  { timestamps: true }
+);
+
+const Message = mongoose.model("Message", messageSchema);
+
+// Helper to get IP
+function getClientIp(req) {
+  return (
+    req.headers["x-forwarded-for"]?.split(",")[0]?.trim() ||
+    req.socket.remoteAddress ||
+    "unknown"
+  );
+}
+
+// 4) API endpoint to receive messages
+app.post("/api/messages", async (req, res) => {
+  try {
+    const { message } = req.body;
+    if (!message || !message.trim()) {
+      return res.status(400).json({ error: "Message is required" });
+    }
+
+    const ip = getClientIp(req);
+    const userAgent = req.headers["user-agent"] || "unknown";
+    const referrer = req.headers["referer"] || req.headers["referrer"] || "unknown";
+
+    await Message.create({
+      text: message.trim(),
+      ip,
+      userAgent,
+      referrer,
+    });
+
+    return res.status(201).json({ ok: true });
+  } catch (err) {
+    console.error("Save error", err);
+    return res.status(500).json({ error: "Server error" });
+  }
+});
+
+// 5) (Optional) simple admin endpoint to see messages in JSON
+app.get("/admin/messages", async (req, res) => {
+  const msgs = await Message.find().sort({ createdAt: -1 }).lean();
+  res.json(msgs);
+});
+
+app.listen(PORT, () => {
+  console.log(`Server running on port ${PORT}`);
+});
