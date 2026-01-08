@@ -5,8 +5,9 @@
   "scripts": {
     "start": "node server.js"
   },
-  "dependencies": {
+  "dependencies": {"dep-d5fma5fpm1nc73dh6u80"
     "express": "^4.19.2",
     "mongoose": "^8.6.1"
   }
+
 }
